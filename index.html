@@ -1,11 +1,18 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Formulario con Firebase y Firestore</title>
+  <meta charset="UTF-8" />
+  <title>Formulario con Firebase - Debug</title>
+  <style>
+    body{font-family: Arial, sans-serif;padding:20px}
+    #status{margin:10px 0;font-weight:bold}
+    table{border-collapse:collapse;width:100%;margin-top:10px}
+    th,td{border:1px solid #ccc;padding:6px;text-align:left}
+  </style>
 </head>
 <body>
-  <h2>Registro de Usuarios</h2>
+  <h1>Registro de Usuarios</h1>
+
   <form id="userForm">
     <label>Nombre:</label>
     <input type="text" id="nombre" required><br><br>
@@ -19,50 +26,90 @@
     <button type="submit">Guardar</button>
   </form>
 
-<script type="module">
-  // Importar Firebase modular
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <div id="status">Estado: —</div>
 
-  // Configuración de Firebase (tuya, la que ya tienes)
+  <h2>Registros (en tiempo real)</h2>
+  <table id="tbl">
+    <thead><tr><th>Nombre</th><th>Email</th><th>Mensaje</th><th>Fecha</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    query,
+    orderBy,
+    onSnapshot,
+    Timestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // --- TU CONFIGURACIÓN DE FIREBASE (usa la tuya) ---
   const firebaseConfig = {
     apiKey: "AIzaSyAPTUxir0TDNm5Z8oplL5M-NQBzhrKaUuc",
     authDomain: "formularioweb-99db6.firebaseapp.com",
     projectId: "formularioweb-99db6",
-    storageBucket: "formularioweb-99db6.firebasestorage.app",
+    storageBucket: "formularioweb-99db6.appspot.com",
     messagingSenderId: "333470951681",
     appId: "1:333470951681:web:efccefa9c6d6ae5c459300"
   };
 
-  // Inicializar Firebase
+  // Inicializar app y Firestore
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  // Capturar formulario
-  const form = document.getElementById("userForm");
+  // Helpers de UI
+  const statusEl = document.getElementById('status');
+  function setStatus(msg, isError=false){
+    statusEl.textContent = 'Estado: ' + msg;
+    statusEl.style.color = isError ? 'crimson' : 'green';
+    console.log(msg);
+  }
 
-  form.addEventListener("submit", async (e) => {
+  const form = document.getElementById('userForm');
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
-
-    let nombre = document.getElementById("nombre").value;
-    let email = document.getElementById("email").value;
-    let mensaje = document.getElementById("mensaje").value;
+    setStatus('Guardando...');
+    const nombre = document.getElementById('nombre').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const mensaje = document.getElementById('mensaje').value.trim();
 
     try {
-      await addDoc(collection(db, "usuarios"), {
-        nombre: nombre,
-        email: email,
-        mensaje: mensaje,
-        fecha: new Date()
+      await addDoc(collection(db, 'usuarios'), {
+        nombre, email, mensaje, fecha: Timestamp.fromDate(new Date())
       });
-      alert("✅ Datos guardados en Firestore");
+      setStatus('Guardado ✅');
       form.reset();
-    } catch (error) {
-      console.error("❌ Error al guardar: ", error);
+    } catch (err) {
+      console.error('Error guardando:', err);
+      setStatus('Error: ' + (err.message || err.code || err), true);
     }
   });
+
+  // Listener en tiempo real para listar documentos y verificar que llegan
+  const tbody = document.getElementById('tbody');
+  const q = query(collection(db, 'usuarios'), orderBy('fecha', 'desc'));
+  onSnapshot(q, (snapshot) => {
+    tbody.innerHTML = '';
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      const fecha = d.fecha && d.fecha.toDate ? d.fecha.toDate().toLocaleString() : '';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${d.nombre||''}</td><td>${d.email||''}</td><td>${d.mensaje||''}</td><td>${fecha}</td>`;
+      tbody.appendChild(tr);
+    });
+  }, (err) => {
+    console.error('Listener error:', err);
+    setStatus('Listener error: ' + (err.message || err.code || err), true);
+  });
+
+  setStatus('Listo — esperando envíos');
 </script>
 </body>
 </html>
+
+
 
 
